@@ -384,7 +384,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#F5F2EE;color:#1C1A18;min-
 
 <script>
 const CLIENT_ID='747116617816-meqgnqrg4l3n79jpfa0vqub8ma10v75n.apps.googleusercontent.com';
-const DEFAULT_API='https://script.google.com/macros/s/AKfycbyRq5jJCrNv7T5d0T4EtPoMAIWNZ8AJP97uMXOoSzTAML3JtCqh9XGpVrgTF8h6M5g/exec';
+const DEFAULT_API='https://script.google.com/macros/s/AKfycbzh_jv3HeaGa65xUUkBALF7UvLmIFRG28wFxo4b-eONsNtXxpXEs4YfXTENW8_6igk_/exec';
 
 // ── 使用者狀態 ──
 let currentUser=null; // {email, name, picture, shiftName}
@@ -565,8 +565,12 @@ async function doSync(){
   btn.disabled=false;btn.textContent='↻ 同步班表與代班記錄';
 }
 
-async function apiPost(body){
-  try{await fetch(S.apiUrl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,email:currentUser.email,name:currentUser.name})});}catch(e){console.error(e);}
+async function apiGet(params){
+  try{
+    const url=S.apiUrl+'?'+new URLSearchParams(params).toString();
+    const res=await fetch(url);
+    return await res.json();
+  }catch(e){console.error('API error',e);return null;}
 }
 
 function sMap(){const m={};S.shifts.forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
@@ -762,7 +766,7 @@ async function addSub(){
   const localId='local_'+Date.now();
   S.subs.push({...sub,id:localId});
   save();renderSubs();
-  await apiPost({action:'addSub',...sub});
+  await apiGet({action:'addSub',email:currentUser.email,name:currentUser.name,date:sub.date,start:sub.start,end:sub.end,colleague:sub.colleague,type:sub.type});
   document.getElementById('subDate').value='';document.getElementById('subCol').value='';
   btn.disabled=false;btn.textContent='新增記錄';
   toast('已新增 ✓');
@@ -771,12 +775,12 @@ async function addSub(){
 async function toggleSettled(id){
   const sub=S.subs.find(x=>x.id===String(id));if(!sub)return;
   sub.settled=!sub.settled;save();renderSubs();
-  await apiPost({action:'updateSub',id,settled:sub.settled});
+  await apiGet({action:'updateSub',id,settled:sub.settled});
   toast(sub.settled?'已標記結清':'已取消結清');
 }
 async function delSub(id){
   S.subs=S.subs.filter(x=>x.id!==String(id));save();renderSubs();
-  await apiPost({action:'deleteSub',id});
+  await apiGet({action:'deleteSub',id});
   toast('已刪除');
 }
 function toggleAcc(id){document.getElementById(id).classList.toggle('open');}
