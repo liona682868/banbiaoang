@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -444,10 +445,11 @@ function handleGoogleLogin(response){
   const name=document.getElementById('loginName').value.trim();
   if(!name){alert('請先輸入你在班表上的名字！');return;}
   try{
-    // 解析 JWT token（處理 base64 padding）
+    alert('收到 Google 回應，開始解析...');
     const base64=response.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
     const padded=base64+('='.repeat((4-base64.length%4)%4));
     const payload=JSON.parse(atob(padded));
+    alert('解析成功！email: '+payload.email);
     currentUser={email:payload.email,name:name,picture:payload.picture||'',googleName:payload.name};
     localStorage.setItem('currentUser',JSON.stringify(currentUser));
     loadState();
@@ -455,8 +457,8 @@ function handleGoogleLogin(response){
     save();
     showApp();
   }catch(err){
+    alert('登入失敗：'+err.message);
     console.error('登入失敗',err);
-    alert('登入失敗，請再試一次');
   }
 }
 
