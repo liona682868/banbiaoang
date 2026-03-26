@@ -583,7 +583,7 @@ async function doSync(){
     S.allShifts=await shiftsRes.json();
     S.shifts=S.allShifts[name]||[];
     const rawSubs=await subsRes.json();
-    S.subs=Array.isArray(rawSubs)?rawSubs.map(cleanSub):[];
+    S.subs=Array.isArray(rawSubs)?rawSubs.map(cleanSub).filter(s=>s!==null):[];
     S.lastSync=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
     document.getElementById('sdot').className='sdot ok';
     document.getElementById('sbarTxt').textContent=`已同步 · ${S.lastSync} · ${S.shifts.length} 筆班次`;
@@ -612,16 +612,20 @@ function cleanSub(s){
   // 修正日期：只取 YYYY-MM-DD 部分
   let date=String(s.date||'');
   const dateMatch=date.match(/(\d{4}-\d{2}-\d{2})/);
-  if(dateMatch) date=dateMatch[1];
-  else{
-    // 嘗試解析成日期
-    const d=new Date(date);
-    if(!isNaN(d)) date=dk(d);
-    else date='';
+  date=dateMatch?dateMatch[1]:'';
+  if(!date)return null;
+  // 修正時間：支援 0:00、4:00、00:00、16:00 等格式，統一補成 HH:MM
+  function fixTime(t){
+    t=String(t||'').trim();
+    const m=t.match(/^(\d{1,2}):(\d{2})$/);
+    if(!m)return'00:00';
+    return String(parseInt(m[1])).padStart(2,'0')+':'+m[2];
   }
+  const start=fixTime(s.start);
+  const end=fixTime(s.end);
   // 修正 settled
   const settled=s.settled===true||s.settled==='TRUE'||s.settled==='已結清'||s.settled==='true';
-  return{...s, date, settled};
+  return{...s,date,start,end,settled};
 }
 
 function sMap(){const m={};S.shifts.forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
