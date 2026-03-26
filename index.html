@@ -198,6 +198,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#F5F2EE;color:#1C1A18;min-
       <input class="login-input" id="loginName" placeholder="例：茜" maxlength="10"/>
     </div>
     <div id="googleSignInBtn"></div>
+    <button id="fallbackBtn" onclick="fallbackLogin()" style="display:none;width:100%;padding:10px;border-radius:8px;background:#1C1A18;color:#F5F2EE;border:none;font-family:inherit;font-size:13px;cursor:pointer;margin-top:8px">以訪客模式登入（不綁定帳號）</button>
     <p class="login-note">登入後資料綁定你的 Google 帳號，<br/>換手機也不會不見</p>
   </div>
 </div>
@@ -429,19 +430,26 @@ window.onload=function(){
   }
 
   // 初始化 Google Sign In（等 script 載入）
+  let googleRetry=0;
   function initGoogle(){
     if(typeof google==='undefined'){
-      setTimeout(initGoogle, 200);
+      googleRetry++;
+      if(googleRetry>20){
+        // 超過4秒還沒載入，顯示備用按鈕
+        document.getElementById('fallbackBtn').style.display='block';
+        return;
+      }
+      setTimeout(initGoogle,200);
       return;
     }
     google.accounts.id.initialize({
-      client_id: CLIENT_ID,
-      callback: handleGoogleLogin,
-      auto_select: false,
+      client_id:CLIENT_ID,
+      callback:handleGoogleLogin,
+      auto_select:false,
     });
     google.accounts.id.renderButton(
       document.getElementById('googleSignInBtn'),
-      {theme:'outline', size:'large', text:'signin_with', locale:'zh-TW', width:272}
+      {theme:'outline',size:'large',text:'signin_with',locale:'zh-TW',width:272}
     );
   }
   initGoogle();
@@ -467,13 +475,12 @@ function handleGoogleLogin(response){
 }
 
 function showApp(){
+  try{
   document.getElementById('loginPage').style.display='none';
   document.getElementById('mainApp').style.display='block';
-  // 更新使用者列
   document.getElementById('userAvatar').src=currentUser.picture||'';
   document.getElementById('userNameBar').textContent=currentUser.name;
   document.getElementById('userEmailBar').textContent=currentUser.email;
-  // 恢復設定
   document.getElementById('apiUrl').value=S.apiUrl||DEFAULT_API;
   const sal=S.sal;
   document.getElementById('salType').value=sal.type;
@@ -488,9 +495,19 @@ function showApp(){
   updateSalUI();
   if(S.lastSync){document.getElementById('sdot').className='sdot ok';document.getElementById('sbarTxt').textContent=`已同步 · ${S.lastSync} · ${S.shifts.length} 筆班次`;}
   renderAll();
+  }catch(err){
+    alert('載入失敗：'+err.message);
+    console.error(err);
+  }
 }
 
-function doLogout(){
+function fallbackLogin(){
+  const name=document.getElementById('loginName').value.trim();
+  if(!name){alert('請先輸入你在班表上的名字！');return;}
+  currentUser={email:'local_'+name,name:name,picture:'',googleName:name};
+  localStorage.setItem('currentUser',JSON.stringify(currentUser));
+  loadState();S.shiftName=name;save();showApp();
+}
   if(!confirm('確定要登出嗎？'))return;
   google.accounts.id.disableAutoSelect();
   localStorage.removeItem('currentUser');
