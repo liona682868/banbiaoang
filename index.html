@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
@@ -246,8 +245,7 @@ body{font-family:'Noto Sans TC',sans-serif;background:#F5F2EE;color:#1C1A18;min-
       <div class="set-row"><span>薪資類型</span><select class="finput-sm" id="salType" onchange="saveSetting();updateSalUI()"><option value="monthly">月薪</option><option value="hourly">時薪</option></select></div>
       <div class="set-row" id="rowBase"><span>底薪</span><input class="finput-sm" type="number" id="salBase" value="27000" oninput="saveSetting()"/></div>
       <div class="set-row" id="rowHourly" style="display:none"><span>時薪</span><input class="finput-sm" type="number" id="salHourly" value="180" oninput="saveSetting()"/></div>
-      <div class="set-row" id="rowAttend"><span>全勤獎金</span><input class="finput-sm" type="number" id="salAttend" value="2000" oninput="saveSetting()"/></div>
-      <div class="set-row" id="rowOtThresh"><span>超時門檻（小時）</span><input class="finput-sm" type="number" id="salOtThresh" value="200" oninput="saveSetting()"/></div>
+      <div class="set-row" id="rowAttend"><span>全勤獎金</span><input class="finput-sm" type="number" id="salAttend" value="2000" oninput="saveSetting()"/></div>      <div class="set-row" id="rowOtThresh"><span>超時門檻（小時）</span><input class="finput-sm" type="number" id="salOtThresh" value="200" oninput="saveSetting()"/></div>
       <div class="set-row" id="rowOtRate"><span>超時時薪</span><input class="finput-sm" type="number" id="salOtRate" value="140" oninput="saveSetting()"/></div>
       <div class="set-row"><span>晚班津貼（每月固定）</span><input class="finput-sm" type="number" id="salEve" value="1000" oninput="saveSetting()"/></div>
       <div class="set-row"><span>大夜班津貼（每月固定）</span><input class="finput-sm" type="number" id="salNight" value="2000" oninput="saveSetting()"/></div>
@@ -445,11 +443,9 @@ function handleGoogleLogin(response){
   const name=document.getElementById('loginName').value.trim();
   if(!name){alert('請先輸入你在班表上的名字！');return;}
   try{
-    alert('收到 Google 回應，開始解析...');
     const base64=response.credential.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
     const padded=base64+('='.repeat((4-base64.length%4)%4));
     const payload=JSON.parse(atob(padded));
-    alert('解析成功！email: '+payload.email);
     currentUser={email:payload.email,name:name,picture:payload.picture||'',googleName:payload.name};
     localStorage.setItem('currentUser',JSON.stringify(currentUser));
     loadState();
@@ -457,8 +453,8 @@ function handleGoogleLogin(response){
     save();
     showApp();
   }catch(err){
-    alert('登入失敗：'+err.message);
-    console.error('登入失敗',err);
+    alert('登入失敗，請再試一次');
+    console.error(err);
   }
 }
 
@@ -533,9 +529,9 @@ function updateSalUI(){
   const isM=document.getElementById('salType').value==='monthly';
   document.getElementById('rowBase').style.display=isM?'flex':'none';
   document.getElementById('rowHourly').style.display=isM?'none':'flex';
-  document.getElementById('rowAttend').style.display=isM?'flex':'none';
   document.getElementById('rowOtThresh').style.display=isM?'flex':'none';
   document.getElementById('rowOtRate').style.display=isM?'flex':'none';
+  // 全勤、晚班津貼、大夜津貼：月薪和時薪都顯示
 }
 
 async function doSync(){
@@ -695,11 +691,33 @@ function cycleRange(year,month){const start=`${year}-${String(month+1).padStart(
 function calcSal(){
   const{start:cs,end:ce}=cycleRange(S.calY,S.calM);const dbls=dblSet();
   let totalH=0,hasEve=false,hasNight=false,dblPay=0,supportPay=0;
-  S.shifts.forEach(s=>{if(s.date<cs||s.date>ce)return;const covMins=S.subs.filter(sub=>sub.type==='covered'&&sub.date===s.date).reduce((a,sub)=>a+overlapMinutes(s.start,s.end,sub.start,sub.end),0);const actualH=(hd(s.start,s.end)*60-covMins)/60;if(actualH<=0)return;totalH+=actualH;const t=sType(s.start);if(t==='eve')hasEve=true;if(t==='night')hasNight=true;if(dbls.has(s.date))dblPay+=actualH*(S.sal.type==='monthly'?S.sal.otRate:S.sal.hourly);});
+  S.shifts.forEach(s=>{
+    if(s.date<cs||s.date>ce)return;
+    const covMins=S.subs.filter(sub=>sub.type==='covered'&&sub.date===s.date).reduce((a,sub)=>a+overlapMinutes(s.start,s.end,sub.start,sub.end),0);
+    const actualH=(hd(s.start,s.end)*60-covMins)/60;
+    if(actualH<=0)return;
+    totalH+=actualH;
+    const t=sType(s.start);
+    if(t==='eve')hasEve=true;
+    if(t==='night')hasNight=true;
+    // 雙倍工資：固定用 140×工時，不管月薪或時薪
+    if(dbls.has(s.date))dblPay+=actualH*140;
+  });
   S.subs.filter(s=>s.type==='support'&&s.date>=cs&&s.date<=ce).forEach(s=>{supportPay+=hd(s.start,s.end)*(S.sal.support||140);});
-  let base=0,otPay=0;if(S.sal.type==='monthly'){base=S.sal.base;otPay=Math.max(0,totalH-S.sal.otThresh)*S.sal.otRate;}else base=totalH*S.sal.hourly;
-  const evePay=hasEve?S.sal.eve:0,nightPay=hasNight?S.sal.night:0,attend=S.sal.type==='monthly'?S.sal.attend:0;
-  return{totalH,base,attend,otPay,evePay,nightPay,dblPay,supportPay,total:base+attend+otPay+evePay+nightPay+dblPay+supportPay,cycleStart:cs,cycleEnd:ce};
+  let base=0,otPay=0;
+  if(S.sal.type==='monthly'){
+    base=S.sal.base;
+    otPay=Math.max(0,totalH-S.sal.otThresh)*S.sal.otRate;
+  }else{
+    base=totalH*S.sal.hourly;
+  }
+  // 津貼：月薪和時薪都有，金額各自設定
+  const evePay=hasEve?S.sal.eve:0;
+  const nightPay=hasNight?S.sal.night:0;
+  const attend=S.sal.attend||0;
+  return{totalH,base,attend,otPay,evePay,nightPay,dblPay,supportPay,
+    total:base+attend+otPay+evePay+nightPay+dblPay+supportPay,
+    cycleStart:cs,cycleEnd:ce};
 }
 
 function renderSal(){
@@ -708,9 +726,11 @@ function renderSal(){
   empty.style.display='none';content.style.display='flex';
   const s=calcSal(),isM=S.sal.type==='monthly';
   document.getElementById('salCard').innerHTML=`<div class="sal-hero"><div class="sal-cycle">薪資週期 ${s.cycleStart} — ${s.cycleEnd}</div><div class="sal-amt">NT$ ${Math.round(s.total).toLocaleString()}</div><div class="sal-sub">實際工時 ${s.totalH.toFixed(1)} 小時</div></div>${isM?`<div class="sal-row"><span class="lbl">底薪</span><span class="val">${s.base.toLocaleString()}</span></div>`:''} ${isM?`<div class="sal-row"><span class="lbl">全勤獎金</span><span class="val">+ ${s.attend.toLocaleString()}</span></div>`:''} ${!isM?`<div class="sal-row"><span class="lbl">時薪小計（${s.totalH.toFixed(1)}h）</span><span class="val">${Math.round(s.base).toLocaleString()}</span></div>`:''} ${s.evePay>0?`<div class="sal-row"><span class="lbl">晚班津貼</span><span class="val" style="color:#5A8070">+ ${s.evePay.toLocaleString()}</span></div>`:''} ${s.nightPay>0?`<div class="sal-row"><span class="lbl">大夜班津貼</span><span class="val" style="color:#4A5568">+ ${s.nightPay.toLocaleString()}</span></div>`:''} ${s.otPay>0?`<div class="sal-row"><span class="lbl">超時費</span><span class="val" style="color:#B05040">+ ${Math.round(s.otPay).toLocaleString()}</span></div>`:''} ${s.dblPay>0?`<div class="sal-row"><span class="lbl">雙倍工資補差額</span><span class="val" style="color:#B05040">+ ${Math.round(s.dblPay).toLocaleString()}</span></div>`:''} ${s.supportPay>0?`<div class="sal-row"><span class="lbl">公司支援薪資</span><span class="val" style="color:#B05040">+ ${Math.round(s.supportPay).toLocaleString()}</span></div>`:''}<div class="sal-row sal-total"><span class="lbl">合計</span><span class="val">NT$ ${Math.round(s.total).toLocaleString()}</span></div>`;
-  let giveH=0,covH=0,supH=0;S.subs.filter(s=>!s.settled).forEach(sub=>{const h=hd(sub.start,sub.end);if(sub.type==='give')giveH+=h;else if(sub.type==='covered')covH+=h;else if(sub.type==='support')supH+=h;});
+  // 代班時數結算：顯示全部（不受結清影響），讓人知道實際賺了多少
+  let giveH=0,covH=0,supH=0;
+  S.subs.forEach(sub=>{const h=hd(sub.start,sub.end);if(sub.type==='give')giveH+=h;else if(sub.type==='covered')covH+=h;else if(sub.type==='support')supH+=h;});
   const netH=giveH-covH,netClr=netH>0?'#5A8070':netH<0?'#B05040':'#8C8680';
-  const netTxt=netH>0?`+${netH.toFixed(1)}h（對方欠我）`:netH<0?`${netH.toFixed(1)}h（我欠對方）`:'±0h';
+  const netTxt=netH>0?`+${netH.toFixed(1)}h（多代了）`:netH<0?`${netH.toFixed(1)}h（被代了）`:'±0h';
   document.getElementById('subHoursCard').innerHTML=`<div class="card-head">代班時數結算（週期 ${s.cycleStart} — ${s.cycleEnd}）</div><div class="sal-row"><span class="lbl">我去代班</span><span class="val" style="color:#5A8070">+${giveH.toFixed(1)}h</span></div><div class="sal-row"><span class="lbl">別人幫我代</span><span class="val" style="color:#B05040">-${covH.toFixed(1)}h</span></div>${supH>0?`<div class="sal-row"><span class="lbl">公司支援</span><span class="val" style="color:#B05040">+${supH.toFixed(1)}h（另計薪）</span></div>`:''}<div class="sal-row sal-total"><span class="lbl">未結清淨時數</span><span class="val" style="color:${netClr}">${netTxt}</span></div>`;
   document.getElementById('statsCard').innerHTML=`<div class="card-head">本週期統計</div><div class="stats-grid"><div class="stat-cell"><div class="stat-num">${S.shifts.length}</div><div class="stat-lbl">班次</div></div><div class="stat-cell"><div class="stat-num">${s.totalH.toFixed(1)}<small style="font-size:11px">h</small></div><div class="stat-lbl">實際工時</div></div><div class="stat-cell"><div class="stat-num" style="color:#9A7D5A">${S.subs.filter(s=>s.type==='give').length}</div><div class="stat-lbl">我去代班</div></div><div class="stat-cell"><div class="stat-num" style="color:#4A5568">${S.subs.filter(s=>s.type==='covered').length}</div><div class="stat-lbl">別人幫我代</div></div></div>`;
   renderDoubleList();
@@ -801,22 +821,72 @@ function calcLeave(){
   const leaveDate=new Date(leaveStr+'T00:00:00'),today=new Date();today.setHours(0,0,0,0);
   const el=document.getElementById('leaveResult');
   function fmtD(d){return `${d.getFullYear()}/${d.getMonth()+1}/${d.getDate()}`;}
-  function getCycle(d){const y=d.getFullYear(),m=d.getMonth(),day=d.getDate();if(day>=16){const ey=m===11?y+1:y,em=m===11?0:m+1;return{start:new Date(y,m,16),end:new Date(ey,em,15)};}else{const sy=m===0?y-1:y,sm=m===0?11:m-1;return{start:new Date(sy,sm,16),end:new Date(y,m,15)};}}
-  function nextC(c){const s=new Date(c.end.getFullYear(),c.end.getMonth(),16);const ey=s.getMonth()===11?s.getFullYear()+1:s.getFullYear(),em=s.getMonth()===11?0:s.getMonth()+1;return{start:s,end:new Date(ey,em,15)};}
-  function deadline(c){const sy=c.start.getMonth()===0?c.start.getFullYear()-1:c.start.getFullYear(),sm=c.start.getMonth()===0?11:c.start.getMonth()-1;return new Date(sy,sm,30);}
-  const todayCycle=getCycle(today),c1=nextC(todayCycle),c2=nextC(c1);
-  if(leaveDate<=todayCycle.end){el.style.display='block';el.innerHTML=`<div class="leave-result leave-warn"><div style="font-size:12px;font-weight:600;color:#B05040;margin-bottom:4px">⚠️ 這個週期的班已排好</div><div style="font-size:12px;color:#1C1A18">無法再畫假，請直接詢問主管。</div></div>`;return;}
+
+  // 每個週期：本月16日 ~ 下月15日
+  function getCycle(d){
+    const y=d.getFullYear(),m=d.getMonth(),day=d.getDate();
+    if(day>=16){const ey=m===11?y+1:y,em=m===11?0:m+1;return{start:new Date(y,m,16),end:new Date(ey,em,15)};}
+    else{const sy=m===0?y-1:y,sm=m===0?11:m-1;return{start:new Date(sy,sm,16),end:new Date(y,m,15)};}
+  }
+  function nextC(c){
+    const s=new Date(c.end.getFullYear(),c.end.getMonth(),16);
+    const ey=s.getMonth()===11?s.getFullYear()+1:s.getFullYear(),em=s.getMonth()===11?0:s.getMonth()+1;
+    return{start:s,end:new Date(ey,em,15)};
+  }
+  // 申請截止日：週期開始月的上月30日
+  function deadline(c){
+    const sy=c.start.getMonth()===0?c.start.getFullYear()-1:c.start.getFullYear();
+    const sm=c.start.getMonth()===0?11:c.start.getMonth()-1;
+    return new Date(sy,sm,30);
+  }
+  // 「可申請」的條件：今天是 c 的申請截止日之前，且 c 是未來的週期
+  // 每月1日起，當前週期推進 → 下下週期變成可申請範圍
+  // 規則：可申請「下一個週期」和「下下個週期」
+  // 切換點是每月「1日」：1日後班表已排好，當前週期不能再畫假
+
+  const todayCycle=getCycle(today);
+  const c1=nextC(todayCycle); // 下一個週期
+  const c2=nextC(c1);         // 下下個週期
+
+  // 當前週期：1日之後就算排好了
+  const cycleLockedAfter=new Date(todayCycle.start.getFullYear(),todayCycle.start.getMonth()+1,1);
+  const currentCycleLocked=today>=cycleLockedAfter;
+
+  if(leaveDate<=todayCycle.end){
+    el.style.display='block';
+    el.innerHTML=`<div class="leave-result leave-warn"><div style="font-size:12px;font-weight:600;color:#B05040;margin-bottom:4px">⚠️ 這個週期的班已排好</div><div style="font-size:12px;color:#1C1A18">無法再畫假，請直接詢問主管。</div></div>`;
+    return;
+  }
+
   let targetCycle=null,label='';
   if(leaveDate>=c1.start&&leaveDate<=c1.end){targetCycle=c1;label='下一個週期';}
   else if(leaveDate>=c2.start&&leaveDate<=c2.end){targetCycle=c2;label='下下個週期';}
   else{
-    let c=c2,steps=0;while(!(leaveDate>=c.start&&leaveDate<=c.end)&&steps<24){c=nextC(c);steps++;}
-    const dl=deadline(c),prevC=getCycle(new Date(c.start.getFullYear(),c.start.getMonth()-1,17));
-    el.style.display='block';el.innerHTML=`<div style="font-size:11px;color:#8C8680;margin-bottom:8px">假期所在週期：${fmtD(c.start)} — ${fmtD(c.end)}</div><div class="leave-result leave-wait"><div style="font-size:12px;font-weight:600;color:#1C1A18;margin-bottom:6px">⏳ 現在還不能申請</div><div style="font-size:13px;color:#1C1A18">最早可申請：<strong>${fmtD(prevC.start)}</strong> 之後<br/>到時候的截止日：<strong>${fmtD(dl)}</strong></div></div>`;return;
+    // 超出兩個週期，找到目標週期
+    let c=c2,steps=0;
+    while(!(leaveDate>=c.start&&leaveDate<=c.end)&&steps<24){c=nextC(c);steps++;}
+    const dl=deadline(c);
+    // 最早可申請：要等到目標週期的前兩個週期「過了1日」
+    // 也就是等到 c 的前一個週期的 1 日
+    const prevC=nextC(getCycle(new Date(c.start.getFullYear(),c.start.getMonth()-1,17)));
+    const earliestDate=new Date(prevC.start.getFullYear(),prevC.start.getMonth()+1,1);
+    el.style.display='block';
+    el.innerHTML=`<div style="font-size:11px;color:#8C8680;margin-bottom:8px">假期所在週期：${fmtD(c.start)} — ${fmtD(c.end)}</div>
+    <div class="leave-result leave-wait">
+      <div style="font-size:12px;font-weight:600;color:#1C1A18;margin-bottom:6px">⏳ 現在還不能申請</div>
+      <div style="font-size:13px;color:#1C1A18">最早可申請：<strong>${fmtD(earliestDate)}</strong><br/>到時候的截止日：<strong>${fmtD(dl)}</strong></div>
+    </div>`;
+    return;
   }
-  const dl=deadline(targetCycle),canNow=today<=dl,daysLeft=Math.ceil((dl-today)/(1000*60*60*24));
+
+  const dl=deadline(targetCycle),canNow=today<=dl;
+  const daysLeft=Math.ceil((dl-today)/(1000*60*60*24));
   el.style.display='block';
-  el.innerHTML=`<div style="font-size:11px;color:#8C8680;margin-bottom:8px">${label}：${fmtD(targetCycle.start)} — ${fmtD(targetCycle.end)}</div>${canNow?`<div class="leave-result leave-ok"><div style="font-size:12px;font-weight:600;color:#5A8070;margin-bottom:6px">✓ 現在就可以申請！</div><div style="font-size:13px;color:#1C1A18">截止日：<strong>${fmtD(dl)}</strong>　還有 <strong style="color:${daysLeft<=3?'#B05040':'#1C1A18'}">${daysLeft} 天</strong></div></div>`:`<div class="leave-result leave-warn"><div style="font-size:12px;font-weight:600;color:#B05040;margin-bottom:6px">⚠️ 申請截止日已過</div><div style="font-size:13px;color:#1C1A18">截止日 ${fmtD(dl)} 已過，請直接詢問主管。</div></div>`}`;
+  el.innerHTML=`<div style="font-size:11px;color:#8C8680;margin-bottom:8px">${label}：${fmtD(targetCycle.start)} — ${fmtD(targetCycle.end)}</div>
+  ${canNow
+    ?`<div class="leave-result leave-ok"><div style="font-size:12px;font-weight:600;color:#5A8070;margin-bottom:6px">✓ 現在就可以申請！</div><div style="font-size:13px;color:#1C1A18">截止日：<strong>${fmtD(dl)}</strong>　還有 <strong style="color:${daysLeft<=3?'#B05040':'#1C1A18'}">${daysLeft} 天</strong></div></div>`
+    :`<div class="leave-result leave-warn"><div style="font-size:12px;font-weight:600;color:#B05040;margin-bottom:6px">⚠️ 申請截止日已過</div><div style="font-size:13px;color:#1C1A18">截止日 ${fmtD(dl)} 已過，請直接詢問主管。</div></div>`
+  }`;
 }
 
 function renderAll(){renderCal();renderSubs();}
