@@ -866,10 +866,16 @@ function calcLeave(){
     let c=c2,steps=0;
     while(!(leaveDate>=c.start&&leaveDate<=c.end)&&steps<24){c=nextC(c);steps++;}
     const dl=deadline(c);
-    // 最早可申請：要等到目標週期的前兩個週期「過了1日」
-    // 也就是等到 c 的前一個週期的 1 日
-    const prevC=nextC(getCycle(new Date(c.start.getFullYear(),c.start.getMonth()-1,17)));
-    const earliestDate=new Date(prevC.start.getFullYear(),prevC.start.getMonth()+1,1);
+    // 最早可申請日：等到 c 變成「下下個週期」
+    // 也就是等到「c 的前前個週期」結束後的下個月1日
+    // c 是目標，c 的前一個是 prevC1，再前一個是 prevC2（就是當時的當前週期）
+    // 當 prevC2 過了它的 1 日，c 就進入可申請範圍
+    // 簡單說：c.start 的前兩個月的 1 日
+    const earliestY=c.start.getMonth()>=2
+      ? c.start.getFullYear()
+      : c.start.getMonth()===1 ? c.start.getFullYear() : c.start.getFullYear()-1;
+    const earliestM=((c.start.getMonth()-2)+12)%12;
+    const earliestDate=new Date(earliestY,earliestM,1);
     el.style.display='block';
     el.innerHTML=`<div style="font-size:11px;color:#8C8680;margin-bottom:8px">假期所在週期：${fmtD(c.start)} — ${fmtD(c.end)}</div>
     <div class="leave-result leave-wait">
