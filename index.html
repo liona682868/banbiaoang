@@ -763,12 +763,9 @@ async function addSub(){
   S.subs.push({...sub,id:localId});
   save();renderSubs();
   await apiPost({action:'addSub',...sub});
-  // 等2秒讓 Sheet 存好再重新抓
-  await new Promise(r=>setTimeout(r,2000));
-  try{const res=await fetch(`${S.apiUrl}?action=getSubs&email=${encodeURIComponent(currentUser.email)}`);const fresh=await res.json();if(Array.isArray(fresh)&&fresh.length>=S.subs.length){S.subs=fresh;save();renderSubs();}}catch(e){}
   document.getElementById('subDate').value='';document.getElementById('subCol').value='';
   btn.disabled=false;btn.textContent='新增記錄';
-  toast('已新增並儲存');
+  toast('已新增 ✓');
 }
 
 async function toggleSettled(id){
