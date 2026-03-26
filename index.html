@@ -557,7 +557,8 @@ async function doSync(){
     ]);
     S.allShifts=await shiftsRes.json();
     S.shifts=S.allShifts[name]||[];
-    S.subs=await subsRes.json();
+    const rawSubs=await subsRes.json();
+    S.subs=Array.isArray(rawSubs)?rawSubs.map(cleanSub):[];
     S.lastSync=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit'});
     document.getElementById('sdot').className='sdot ok';
     document.getElementById('sbarTxt').textContent=`已同步 · ${S.lastSync} · ${S.shifts.length} 筆班次`;
@@ -581,7 +582,22 @@ async function apiGet(params){
   }catch(e){console.error('API error',e);return null;}
 }
 
-function sMap(){const m={};S.shifts.forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
+// 清理從 Sheet 抓回來的代班資料，修正日期和 settled 格式
+function cleanSub(s){
+  // 修正日期：只取 YYYY-MM-DD 部分
+  let date=String(s.date||'');
+  const dateMatch=date.match(/(\d{4}-\d{2}-\d{2})/);
+  if(dateMatch) date=dateMatch[1];
+  else{
+    // 嘗試解析成日期
+    const d=new Date(date);
+    if(!isNaN(d)) date=dk(d);
+    else date='';
+  }
+  // 修正 settled
+  const settled=s.settled===true||s.settled==='TRUE'||s.settled==='已結清'||s.settled==='true';
+  return{...s, date, settled};
+}const m={};S.shifts.forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
 function gMap(){const m={};S.subs.filter(s=>s.type==='give').forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
 function cMap(){const m={};S.subs.filter(s=>s.type==='covered').forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
 function supMap(){const m={};S.subs.filter(s=>s.type==='support').forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
