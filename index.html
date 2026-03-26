@@ -426,7 +426,12 @@ window.onload=function(){
       loadState();
       showApp();
       return;
-    }catch(e){localStorage.removeItem('currentUser');}
+    }catch(e){
+      // 出錯就清掉，重新登入
+      localStorage.removeItem('currentUser');
+      currentUser=null;
+      document.getElementById('loginPage').style.display='flex';
+    }
   }
 
   // 初始化 Google Sign In（等 script 載入）
@@ -476,28 +481,29 @@ function handleGoogleLogin(response){
 
 function showApp(){
   try{
-  document.getElementById('loginPage').style.display='none';
-  document.getElementById('mainApp').style.display='block';
-  document.getElementById('userAvatar').src=currentUser.picture||'';
-  document.getElementById('userNameBar').textContent=currentUser.name;
-  document.getElementById('userEmailBar').textContent=currentUser.email;
-  document.getElementById('apiUrl').value=S.apiUrl||DEFAULT_API;
-  const sal=S.sal;
-  document.getElementById('salType').value=sal.type;
-  document.getElementById('salBase').value=sal.base;
-  document.getElementById('salHourly').value=sal.hourly;
-  document.getElementById('salAttend').value=sal.attend;
-  document.getElementById('salOtThresh').value=sal.otThresh;
-  document.getElementById('salOtRate').value=sal.otRate;
-  document.getElementById('salEve').value=sal.eve;
-  document.getElementById('salNight').value=sal.night;
-  document.getElementById('salSupport').value=sal.support||140;
-  updateSalUI();
-  if(S.lastSync){document.getElementById('sdot').className='sdot ok';document.getElementById('sbarTxt').textContent=`已同步 · ${S.lastSync} · ${S.shifts.length} 筆班次`;}
-  renderAll();
+    document.getElementById('loginPage').style.display='none';
+    document.getElementById('mainApp').style.display='block';
+    document.getElementById('userAvatar').src=currentUser.picture||'';
+    document.getElementById('userNameBar').textContent=currentUser.name;
+    document.getElementById('userEmailBar').textContent=currentUser.email;
+    document.getElementById('apiUrl').value=S.apiUrl||DEFAULT_API;
+    const sal=S.sal;
+    document.getElementById('salType').value=sal.type;
+    document.getElementById('salBase').value=sal.base;
+    document.getElementById('salHourly').value=sal.hourly;
+    document.getElementById('salAttend').value=sal.attend;
+    document.getElementById('salOtThresh').value=sal.otThresh;
+    document.getElementById('salOtRate').value=sal.otRate;
+    document.getElementById('salEve').value=sal.eve;
+    document.getElementById('salNight').value=sal.night;
+    document.getElementById('salSupport').value=sal.support||140;
+    updateSalUI();
+    if(S.lastSync){document.getElementById('sdot').className='sdot ok';document.getElementById('sbarTxt').textContent=`已同步 · ${S.lastSync} · ${S.shifts.length} 筆班次`;}
+    renderAll();
   }catch(err){
-    alert('載入失敗：'+err.message);
-    console.error(err);
+    console.error('showApp error:',err);
+    localStorage.removeItem('currentUser');
+    location.reload();
   }
 }
 
@@ -508,6 +514,8 @@ function fallbackLogin(){
   localStorage.setItem('currentUser',JSON.stringify(currentUser));
   loadState();S.shiftName=name;save();showApp();
 }
+
+function doLogout(){
   if(!confirm('確定要登出嗎？'))return;
   google.accounts.id.disableAutoSelect();
   localStorage.removeItem('currentUser');
@@ -614,7 +622,9 @@ function cleanSub(s){
   // 修正 settled
   const settled=s.settled===true||s.settled==='TRUE'||s.settled==='已結清'||s.settled==='true';
   return{...s, date, settled};
-}const m={};S.shifts.forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
+}
+
+function sMap(){const m={};S.shifts.forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
 function gMap(){const m={};S.subs.filter(s=>s.type==='give').forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
 function cMap(){const m={};S.subs.filter(s=>s.type==='covered').forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
 function supMap(){const m={};S.subs.filter(s=>s.type==='support').forEach(s=>{if(!m[s.date])m[s.date]=[];m[s.date].push(s);});return m;}
