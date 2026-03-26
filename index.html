@@ -726,12 +726,20 @@ function renderSal(){
   empty.style.display='none';content.style.display='flex';
   const s=calcSal(),isM=S.sal.type==='monthly';
   document.getElementById('salCard').innerHTML=`<div class="sal-hero"><div class="sal-cycle">薪資週期 ${s.cycleStart} — ${s.cycleEnd}</div><div class="sal-amt">NT$ ${Math.round(s.total).toLocaleString()}</div><div class="sal-sub">實際工時 ${s.totalH.toFixed(1)} 小時</div></div>${isM?`<div class="sal-row"><span class="lbl">底薪</span><span class="val">${s.base.toLocaleString()}</span></div>`:''} ${isM?`<div class="sal-row"><span class="lbl">全勤獎金</span><span class="val">+ ${s.attend.toLocaleString()}</span></div>`:''} ${!isM?`<div class="sal-row"><span class="lbl">時薪小計（${s.totalH.toFixed(1)}h）</span><span class="val">${Math.round(s.base).toLocaleString()}</span></div>`:''} ${s.evePay>0?`<div class="sal-row"><span class="lbl">晚班津貼</span><span class="val" style="color:#5A8070">+ ${s.evePay.toLocaleString()}</span></div>`:''} ${s.nightPay>0?`<div class="sal-row"><span class="lbl">大夜班津貼</span><span class="val" style="color:#4A5568">+ ${s.nightPay.toLocaleString()}</span></div>`:''} ${s.otPay>0?`<div class="sal-row"><span class="lbl">超時費</span><span class="val" style="color:#B05040">+ ${Math.round(s.otPay).toLocaleString()}</span></div>`:''} ${s.dblPay>0?`<div class="sal-row"><span class="lbl">雙倍工資補差額</span><span class="val" style="color:#B05040">+ ${Math.round(s.dblPay).toLocaleString()}</span></div>`:''} ${s.supportPay>0?`<div class="sal-row"><span class="lbl">公司支援薪資</span><span class="val" style="color:#B05040">+ ${Math.round(s.supportPay).toLocaleString()}</span></div>`:''}<div class="sal-row sal-total"><span class="lbl">合計</span><span class="val">NT$ ${Math.round(s.total).toLocaleString()}</span></div>`;
-  // 代班時數結算：顯示全部（不受結清影響），讓人知道實際賺了多少
+  // 代班時數結算：顯示全部（不受結清影響），讓人知道這個月實際代了多少
   let giveH=0,covH=0,supH=0;
   S.subs.forEach(sub=>{const h=hd(sub.start,sub.end);if(sub.type==='give')giveH+=h;else if(sub.type==='covered')covH+=h;else if(sub.type==='support')supH+=h;});
   const netH=giveH-covH,netClr=netH>0?'#5A8070':netH<0?'#B05040':'#8C8680';
   const netTxt=netH>0?`+${netH.toFixed(1)}h（多代了）`:netH<0?`${netH.toFixed(1)}h（被代了）`:'±0h';
-  document.getElementById('subHoursCard').innerHTML=`<div class="card-head">代班時數結算（週期 ${s.cycleStart} — ${s.cycleEnd}）</div><div class="sal-row"><span class="lbl">我去代班</span><span class="val" style="color:#5A8070">+${giveH.toFixed(1)}h</span></div><div class="sal-row"><span class="lbl">別人幫我代</span><span class="val" style="color:#B05040">-${covH.toFixed(1)}h</span></div>${supH>0?`<div class="sal-row"><span class="lbl">公司支援</span><span class="val" style="color:#B05040">+${supH.toFixed(1)}h（另計薪）</span></div>`:''}<div class="sal-row sal-total"><span class="lbl">未結清淨時數</span><span class="val" style="color:${netClr}">${netTxt}</span></div>`;
+  const estAmt=Math.round(Math.abs(netH)*140);
+  const estTxt=netH>0?`多賺了約 NT$ ${estAmt.toLocaleString()}`:netH<0?`要付出去約 NT$ ${estAmt.toLocaleString()}`:'持平';
+  document.getElementById('subHoursCard').innerHTML=`
+    <div class="card-head">代班時數（本週期）</div>
+    <div class="sal-row"><span class="lbl">我去代班</span><span class="val" style="color:#5A8070">+${giveH.toFixed(1)}h</span></div>
+    <div class="sal-row"><span class="lbl">別人幫我代</span><span class="val" style="color:#B05040">-${covH.toFixed(1)}h</span></div>
+    ${supH>0?`<div class="sal-row"><span class="lbl">公司支援</span><span class="val" style="color:#B05040">+${supH.toFixed(1)}h（另計薪）</span></div>`:''}
+    <div class="sal-row sal-total"><span class="lbl">代班淨時數</span><span class="val" style="color:${netClr}">${netTxt}</span></div>
+    <div class="sal-row" style="background:#F5F2EE"><span class="lbl" style="color:#B5B0AA">粗估金額（以 140/h 計）</span><span class="val" style="color:#B5B0AA">${estTxt}</span></div>`;
   document.getElementById('statsCard').innerHTML=`<div class="card-head">本週期統計</div><div class="stats-grid"><div class="stat-cell"><div class="stat-num">${S.shifts.length}</div><div class="stat-lbl">班次</div></div><div class="stat-cell"><div class="stat-num">${s.totalH.toFixed(1)}<small style="font-size:11px">h</small></div><div class="stat-lbl">實際工時</div></div><div class="stat-cell"><div class="stat-num" style="color:#9A7D5A">${S.subs.filter(s=>s.type==='give').length}</div><div class="stat-lbl">我去代班</div></div><div class="stat-cell"><div class="stat-num" style="color:#4A5568">${S.subs.filter(s=>s.type==='covered').length}</div><div class="stat-lbl">別人幫我代</div></div></div>`;
   renderDoubleList();
 }
